@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>A Word Becomes a Universe</title>
+  <style>
+    :root{
+      --bg:#02040a;
+      --panel:rgba(10,16,28,.72);
+      --border:rgba(255,255,255,.12);
+      --text:#f5f7ff;
+      --muted:rgba(255,255,255,.7);
+      --soft:rgba(255,255,255,.08);
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+    canvas{display:block}
+
+    .panel{
+      position:fixed;
+      backdrop-filter: blur(12px);
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:18px;
+      z-index:10;
+      box-shadow:0 12px 40px rgba(0,0,0,.35);
+    }
+
+    #topbar{
+      top:18px;
+      left:18px;
+      width:min(430px,calc(100vw - 36px));
+      padding:16px;
+    }
+
+    h1{
+      margin:0 0 6px;
+      font-size:24px;
+      line-height:1.1;
+      font-weight:700;
+      letter-spacing:-0.02em;
+    }
+
+    .subtitle{
+      margin:0 0 14px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+    .controls{
+      display:flex;
+      gap:10px;
+    }
+
+    input{
+      flex:1;
+      min-width:0;
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      outline:none;
+      font-size:14px;
+    }
+
+    input::placeholder{
+      color:rgba(255,255,255,.45);
+    }
+
+    button{
+      padding:12px 16px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.08);
+      color:var(--text);
+      cursor:pointer;
+      font-size:14px;
+      transition:.2s ease;
+    }
+
+    button:hover{
+      background:rgba(255,255,255,.14);
+    }
+
+    button:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+    }
+
+    #info{
+      right:18px;
+      top:18px;
+      width:min(320px,calc(100vw - 36px));
+      padding:16px;
+    }
+
+    .meta-label{
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:rgba(255,255,255,.48);
+      margin-bottom:4px;
+    }
+
+    .meta-value{
+      font-size:15px;
+      line-height:1.5;
+      margin-bottom:14px;
+      word-break:break-word;
+    }
+
+    #status{
+      left:18px;
+      bottom:18px;
+      width:min(420px,calc(100vw - 36px));
+      padding:14px 16px;
+      white-space:pre-wrap;
+      font-size:13px;
+      line-height:1.6;
+      color:var(--muted);
+    }
+
+    .hint{
+      font-size:12px;
+      color:rgba(255,255,255,.55);
+      margin-top:10px;
+      line-height:1.5;
+    }
+
+    @media (max-width: 768px){
+      #info{
+        top:auto;
+        bottom:18px;
+        right:18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="topbar" class="panel">
+    <h1>A Word Becomes a Universe</h1>
+    <p class="subtitle">
+      Type a word and explore how one concept expands into a constellation of related ideas.
+    </p>
+
+    <div class="controls">
+      <input id="kw" placeholder="e.g. Memory, Time, Dream, Love" />
+      <button id="go">Generate</button>
+    </div>
+
+    <div class="hint">
+      Click a node to make it the next center. Drag nodes to rearrange the constellation.
+    </div>
+  </div>
+
+  <div id="info" class="panel">
+    <div class="meta-label">Current keyword</div>
+    <div class="meta-value" id="currentWord">—</div>
+
+    <div class="meta-label">Hovered node</div>
+    <div class="meta-value" id="hoveredWord">—</div>
+
+    <div class="meta-label">Connections</div>
+    <div class="meta-value" id="connections">—</div>
+  </div>
+
+  <div id="status" class="panel">Ready.</div>
+
+  <script>
+    const kwInput = document.getElementById('kw');
+    const goBtn = document.getElementById('go');
+    const statusEl = document.getElementById('status');
+    const currentWordEl = document.getElementById('currentWord');
+
+    async function loadKeyword(keyword) {
+      const kw = (keyword || '').trim();
+      if (!kw) return;
+
+      goBtn.disabled = true;
+      goBtn.textContent = 'Loading...';
+      statusEl.textContent = `Loading "${kw}"...`;
+
+      try {
+        const res = await fetch(`/api/constellation?keyword=${encodeURIComponent(kw)}`);
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Unknown error.');
+        }
+
+        currentWordEl.textContent = data.root || kw;
+        statusEl.textContent =
+          `nodes: ${data.nodeCount}\nlinks: ${data.linkCount}\n\nclick a node to continue exploring\npress S to save PNG`;
+
+        if (window.setGraphData) {
+          window.setGraphData(data, kw);
+        }
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      } finally {
+        goBtn.disabled = false;
+        goBtn.textContent = 'Generate';
+      }
+    }
+
+    goBtn.addEventListener('click', () => {
+      loadKeyword(kwInput.value);
+    });
+
+    kwInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        loadKeyword(kwInput.value);
+      }
+    });
+
+    window.loadKeyword = loadKeyword;
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+  <script src="sketch.js"></script>
+</body>
+</html>
